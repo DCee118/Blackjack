@@ -1,105 +1,168 @@
-import random
+import time
+from itertools import product
+from random import shuffle
 
-# Suits and Ranks for the cards
-suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
-ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King', 'Ace']
+# define suits and ranks using Unicode symbols for suits
+SUITS = ["\u2663", "\u2665", "\u2666", "\u2660"]  # Clubs, Hearts, Diamonds, Spades
+RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
-# Card values in Blackjack
-values = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-          'Jack': 10, 'Queen': 10, 'King': 10, 'Ace': 11}
-
-# Card class to represent each card with rank and suit
+# card class to represent each card with rank and suit
 class Card:
     def __init__(self, rank, suit):
         self.rank = rank
         self.suit = suit
 
     def __repr__(self):
-        return f"{self.rank} of {self.suit}" 
+        return f"{self.rank}{self.suit}"
 
     @property
     def value(self):
-        return values[self.rank]
+        return 10 if self.rank in ['J', 'Q', 'K'] else 11 if self.rank == 'A' else int(self.rank)
 
-# Deck class to represent a full deck of cards
+# deck class to represent a full deck of cards
 class Deck:
     def __init__(self):
-        self.cards = [Card(rank, suit) for suit in suits for rank in ranks]
-        random.shuffle(self.cards) 
+        self.cards = [Card(rank, suit) for rank, suit in product(RANKS, SUITS)]
+        shuffle(self.cards)
 
     def draw(self):
-        return self.cards.pop()  # Draw a card from the deck
+        return self.cards.pop()
 
-def calculate_hand(hand):
+# calcultes the value of the hand and changes the value of the ace depending on if the hand is over 21.
+def calculate_hand_value(hand):
     value = sum(card.value for card in hand)
-    aces = sum(1 for card in hand if card.rank == 'Ace')
+    aces = sum(1 for card in hand if card.rank == 'A')
     while value > 21 and aces:
         value -= 10
         aces -= 1
     return value
 
-def player_hand(deck):
-    hand = [deck.draw(), deck.draw()]
+# visual representation of the cards plus the value.
+def display_hand(hand):
+    visual_card = " ".join(f"{card.rank}{card.suit}" for card in hand)
+    value = calculate_hand_value(hand)
+    return f"{visual_card} Value: {value}"
+
+# dealer dealing himself and the player the first two cards each
+def deal_initial_cards(deck, player_hand, dealer_hand):
+    print('Dealer deals you one card.')
+    player_hand.append(deck.draw())  
+    print(display_hand(player_hand))    
+    time.sleep(1)
     
+    print('Dealer deals himself one card.')
+    dealer_hand.append(deck.draw())  
+    print(display_hand(dealer_hand))    
+    time.sleep(1)
+    
+    print('Dealer deals you your second card.')
+    player_hand.append(deck.draw())  
+    print(display_hand(player_hand))    
+    time.sleep(1)
+    
+    print('Dealer deals himself a second card face down.')
+    dealer_hand.append(deck.draw())     
+    time.sleep(1)
+    
+# handle the player's turn: the player can either stick or hit. 
+def player_turn(deck, hand):
     while True:
-        value = calculate_hand(hand)
-        print(f"Your hand: {hand}, value: {value}") 
+        value = calculate_hand_value(hand)
 
         if value == 21:
-            print("Blackjack!")
+            print("You have 21!")
             return value
-        if value > 21:
-            print("Bust!")
-            return value    
+        elif value > 21:
+            print("Bust! You exceeded 21.")
+            return value
 
-        hit_or_stick = input('Press 1 to Stick\nPress 2 to Hit\n')
-        if hit_or_stick == '1':
-            print(f"Final hand: {hand}, value: {value}")
-            return value 
-        elif hit_or_stick == '2':
-            hand.append(deck.draw())
+        action = input("Press 1 to Stick or 2 to Hit: ").strip()
+        if action == '1':
+            print(f"You chose to Stick with {value}.")
+            return value
+        elif action == '2':
+            hand.append(deck.draw())  
+            print("You drew a card.")
+            print(display_hand(hand))
+            time.sleep(1)
         else:
-            print("Invalid input, please enter 1 to Stick or 2 to Hit.")
+            print("Invalid input. Please enter 1 to Stick or 2 to Hit.")
 
+# handle the dealer's turn: the dealer must hit until their hand value is 17 or higher.
+def dealer_turn(deck, hand):
+    print("\nDealer's turn:")
+    time.sleep(1)  
+    print("Dealer flips over second card.")
+    time.sleep(1) 
+    print(display_hand(hand))
+    while calculate_hand_value(hand) < 17:
+        hand.append(deck.draw())  
+        print("Dealer draws a card:")
+        time.sleep(1)
+        print(display_hand(hand))
+        time.sleep(2)  
 
+    dealer_value = calculate_hand_value(hand)
+    return dealer_value
+
+# if the hand is blackjack. 
 def is_blackjack(hand):
     return len(hand) == 2 and (
-        (hand[0].rank == 'Ace' and hand[1].value == 10) or
-        (hand[1].rank == 'Ace' and hand[0].value == 10)
+        (hand[0].rank == 'A' and hand[1].value == 10) or
+        (hand[1].rank == 'A' and hand[0].value == 10)
     )
-    
-def dealer_hand(deck):
-    hand = [deck.draw(), deck.draw()]
-    print(f"Dealer's initial hand: {hand}")
 
-    # Dealer must hit until the hand is at least 17
-    while calculate_hand(hand) < 17:
-        hand.append(deck.draw())
-        print(f"Dealer draws: {hand}")
-    
-    return calculate_hand(hand)
+# determine win, lose or draw
+def game_result(player_hand, dealer_hand, deck):
+    player_blackjack = is_blackjack(player_hand)
+    dealer_blackjack = is_blackjack(dealer_hand)
 
-def main():
-    deck = Deck() 
-    player = player_hand(deck)
-    dealer = dealer_hand(deck)
+    # check for blackjack scenarios
+    if player_blackjack and dealer_blackjack:
+        return "Both you and the dealer have Blackjack! It's a push!"
+    elif player_blackjack:
+        return "Blackjack! You win!"
+    elif dealer_blackjack:
+        return "Dealer has Blackjack! Dealer wins!"
 
-    print(f"Player hand value: {player}")
-    print(f"Dealer hand value: {dealer}")
+    # if no blackjack, proceed with player's turn
+    print("\nPlayer's turn:")
+    player_value = player_turn(deck, player_hand)
 
-    if player > 21:
-        print('BUST')
-    elif player == 21:
-        print('Blackjack!')
-    elif dealer > 21:
-        print('Dealer BUST, You Win!')
-    elif player > dealer:
-        print('You Win!')
-    elif player == dealer:
-        print('Push.')
+    # check if the player busts
+    if player_value > 21:
+        return "Dealer wins!"
     else:
-        print('Dealer Wins.')
+        # proceed with the dealer's turn
+        dealer_value = dealer_turn(deck, dealer_hand)
+        print("\nDealer's final hand:")
+        print(display_hand(dealer_hand))
 
+        # final result
+        if dealer_value > 21:
+            return "Dealer busts! You win!"
+        elif player_value > dealer_value:
+            return f"You win! Your {player_value} beats Dealer's {dealer_value}."
+        elif player_value < dealer_value:
+            return f"Dealer wins with {dealer_value}."
+        else:
+            return "Push."
+                  
+def main():
+    play_again = True
+
+    while play_again:
+        deck = Deck()
+        player_hand = []
+        dealer_hand = []
+
+        deal_initial_cards(deck, player_hand, dealer_hand)
+
+        print(game_result(player_hand, dealer_hand, deck))
+
+        play_again = input('Play again? (Yes or No): ').strip().lower() == 'yes'
+
+    print("Thanks for playing!")
 
 if __name__ == "__main__":
     main()
